@@ -261,6 +261,41 @@
   })();
   else if (news) news.classList.add('news--static');
 
+  /* ---------- shop deck: deals the next product every 3.5 s (pause button, hover, focus, off screen, hidden tab); reduced motion steps by hand ---------- */
+  var deck = $('[data-deck]');
+  if (deck) (function () {
+    var cards = $$('.deck__card', deck), order = cards.map(function (_, i) { return i; }), dplay = $('[data-deck-play]'), dcount = $('[data-deck-count]'), dnext = $('[data-deck-next]');
+    var POS = [[0, 0, -2], [22, -12, 5], [-20, -18, -8]], dAuto = !reduce.matches, dIn = false, dHold = false, timer = null, busy = false;
+    var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    var lay = function () {
+      order.forEach(function (ci, r) {
+        var c = cards[ci], p = POS[r];
+        c.style.zIndex = String(10 - r);
+        c.style.transform = p ? 'translate(' + p[0] + 'px,' + p[1] + 'px) rotate(' + p[2] + 'deg)' : 'translate(0,-24px) scale(.94)';
+        c.style.opacity = p ? '1' : '0';
+        c.setAttribute('aria-hidden', r === 0 ? 'false' : 'true'); c.tabIndex = r === 0 ? 0 : -1;
+      });
+      if (dcount) dcount.textContent = pad2(order[0] + 1) + ' / ' + pad2(cards.length);
+    };
+    var deal = function () {
+      if (busy) return; busy = true;
+      var f = cards[order[0]];
+      f.style.transform = 'translate(-115%,30px) rotate(-18deg)'; f.style.opacity = '0';
+      setTimeout(function () { order.push(order.shift()); lay(); busy = false; }, reduce.matches ? 0 : 420);
+    };
+    var run = function () { clearInterval(timer); timer = null; if (dAuto && dIn && !dHold && !document.hidden) timer = setInterval(deal, 3500); };
+    var setDAuto = function (on) { dAuto = on; dplay.dataset.state = on ? 'play' : 'paused'; dplay.dataset.ariaIs = on ? 'Stöðva sjálfvirka spilun' : 'Spila sjálfvirkt'; dplay.dataset.ariaEn = on ? 'Pause autoplay' : 'Play automatically'; dplay.setAttribute('aria-label', root.lang === 'en' ? dplay.dataset.ariaEn : dplay.dataset.ariaIs); run(); };
+    dplay.addEventListener('click', function () { setDAuto(!dAuto); });
+    dnext.addEventListener('click', function () { deal(); run(); });
+    deck.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') { dHold = true; run(); } });
+    deck.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') { dHold = false; run(); } });
+    deck.addEventListener('focusin', function () { dHold = true; run(); });
+    deck.addEventListener('focusout', function (e) { if (!deck.contains(e.relatedTarget)) { dHold = false; run(); } });
+    document.addEventListener('visibilitychange', run);
+    if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { dIn = es[0].isIntersecting; run(); }, { threshold: 0.3 }).observe(deck); else dIn = true;
+    lay(); setDAuto(dAuto);
+  })();
+
   $$('[data-year]').forEach(function (el) { el.textContent = new Date().getFullYear(); });
 
   /* ---------- static rotation fallbacks are CSS; motion below ---------- */
@@ -289,6 +324,9 @@
       gsap.fromTo(scraps, { opacity: 0, y: -140, rotation: function (i, el) { return +el.dataset.rot + (i % 2 ? 22 : -22); }, scale: 1.08 },
         { opacity: 1, y: 0, rotation: function (i, el) { return window.innerWidth < 1100 ? (i % 2 ? 1.5 : -1.5) : +el.dataset.rot; }, scale: 1, duration: 0.9, ease: 'back.out(1.25)', stagger: { each: 0.08, from: 'random' } });
     } });
+    /* the tilt follows the current width: a window narrowed after load must not keep the wide-screen tilts */
+    var scrapT = null;
+    window.addEventListener('resize', function () { clearTimeout(scrapT); scrapT = setTimeout(function () { var w = window.innerWidth; scraps.forEach(function (el, i) { if (!gsap.isTweening(el)) gsap.set(el, { rotation: w < 1100 ? (i % 2 ? 1.5 : -1.5) : +el.dataset.rot }); }); }, 120); });
     /* location: black bar wipes in under the address */
     var bar = $('[data-bar]');
     if (bar) gsap.fromTo(bar, { '--bar': 0 }, { '--bar': 1, duration: 0.9, ease: 'power3.inOut', scrollTrigger: { trigger: bar, start: 'top 80%' } });
